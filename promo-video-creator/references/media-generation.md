@@ -39,7 +39,7 @@ PYTHONUTF8=1 python scripts/agnes_api.py video --prompt-file video_prompt.txt --
 - 视频提示词必须和关键帧一致。
 - 不在提示词里要求模型直接输出字幕文字。
 - 需要字幕时，在分镜文档中记录字幕信息，交给后期轨道。
-- 需要旁白时，只预留音频占位，不在本阶段补音频。
+- 需要旁白时，交给 `references/audio-generation.md` 生成 MP3 配音。
 
 ## 失败处理
 - 关键帧偏离预期：重写 `prompt_brief` 后再生成。

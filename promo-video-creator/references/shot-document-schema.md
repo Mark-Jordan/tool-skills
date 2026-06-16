@@ -43,7 +43,7 @@
       required: true
       status: reserved
       voiceover_text: ""
-      placeholder_path: output/audio/S01_voiceover.wav
+      placeholder_path: output/audio/S01_voiceover.mp3
 
 Prompt Brief 建议：
 
@@ -65,7 +65,7 @@ Prompt Brief 建议：
 - `sequence_index` 从 1 连续递增。
 - `duration_seconds` 不要超过当前视频工具稳定范围。
 - `subtitle.enabled` 表示是否需要后期字幕。
-- `audio.required` 表示是否需要预留音频。
+- `audio.required` 表示是否需要生成或预留音频。
 - `image_prompt` 不描述运动。
 - `video_prompt` 不重新定义场景，只描述基于关键帧的运动。
 

@@ -16,7 +16,7 @@ output/
 ├── composition_manifest.yaml
 ├── audio/
 │   ├── audio_manifest.yaml
-│   └── S01_voiceover.wav
+│   └── S01_voiceover.mp3
 ├── images/
 │   └── S01_keyframe.png
 ├── videos/
@@ -64,12 +64,12 @@ shots:
 - `video_prompt`
 - `negative_prompt`
 
-## 音频占位
-如果该镜头需要旁白或字幕语义绑定，则保留：
+## 音频
+如果该镜头需要旁白，则生成 MP3；如果生成失败，则保留占位：
 - `output/audio/audio_manifest.yaml`
-- `output/audio/SXX_voiceover.wav`
+- `output/audio/SXX_voiceover.mp3`
 
-当前 skill 只预留结构，不生成真实音频。
+仅需要后期字幕、不需要旁白时，不生成音频文件。
 
 ## 合成清单
 `composition_manifest.yaml` 用于 HyperFrames 拼接，建议字段：
