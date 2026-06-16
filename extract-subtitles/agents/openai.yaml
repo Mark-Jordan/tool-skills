@@ -1,0 +1,7 @@
+interface:
+  display_name: "Extract Subtitles"
+  short_description: "从视频生成字幕并进行语义纠正"
+  default_prompt: "Use $extract-subtitles to extract subtitles from my video and correct the transcript."
+
+policy:
+  allow_implicit_invocation: true

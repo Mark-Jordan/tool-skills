@@ -2,7 +2,7 @@
 """
 视频字幕提取脚本（仅负责转录和格式转换，不含语义纠正）
 ========================================================
-流程: MP4查找 → 音频提取 → faster-whisper转录 → SRT字幕 → 纯文本 → 繁转简
+流程: 模型检查 → MP4查找 → 音频提取 → faster-whisper转录 → SRT字幕 → 纯文本 → 繁转简
 
 语义纠正由调用方（Claude大模型）在脚本执行完成后处理。
 
@@ -20,6 +20,7 @@ import os
 import subprocess
 import sys
 from pathlib import Path
+from typing import Optional
 
 # ── SSL 修复（Windows + conda 常见问题） ──
 try:
@@ -32,30 +33,48 @@ except ImportError:
 os.environ.setdefault("HF_ENDPOINT", "https://hf-mirror.com")
 
 
-def find_videos(work_dir: Path) -> list[Path]:
-    """查找目录下所有 MP4 视频文件"""
-    videos = sorted(work_dir.glob("*.mp4"))
+def find_videos(input_path: Path) -> list[Path]:
+    """根据输入路径查找 MP4 视频文件"""
+    if input_path.is_file():
+        if input_path.suffix.lower() != ".mp4":
+            raise ValueError(f"输入文件不是 MP4: {input_path}")
+        return [input_path]
+
+    videos = sorted(input_path.glob("*.mp4"))
     if not videos:
-        raise FileNotFoundError(f"目录下未找到 MP4 文件: {work_dir}")
+        raise FileNotFoundError(f"目录下未找到 MP4 文件: {input_path}")
     return videos
 
 
-def download_model(model_size: str, cache_dir: Path) -> str:
-    """从国内镜像下载 faster-whisper 模型，返回本地快照路径"""
-    from huggingface_hub import snapshot_download
-
-    repo_id = f"Systran/faster-whisper-{model_size}"
-    print(f"[下载] 模型 {repo_id} (镜像: hf-mirror.com)...")
-
-    snapshot_download(repo_id, cache_dir=str(cache_dir))
-
+def get_cached_model_path(model_size: str, cache_dir: Path) -> Optional[str]:
+    """返回已缓存的 faster-whisper 模型路径；不存在时返回 None"""
     models_root = cache_dir / f"models--Systran--faster-whisper-{model_size}"
     snapshots_dir = models_root / "snapshots"
-    if snapshots_dir.exists():
-        snapshots = sorted(snapshots_dir.iterdir())
-        if snapshots:
-            return str(snapshots[-1])
-    raise FileNotFoundError(f"模型下载后未找到: {snapshots_dir}")
+    if not snapshots_dir.exists():
+        return None
+
+    snapshots = sorted(p for p in snapshots_dir.iterdir() if p.is_dir())
+    if not snapshots:
+        return None
+    return str(snapshots[-1])
+
+
+def ensure_model(model_size: str, cache_dir: Path) -> str:
+    """检查 faster-whisper 模型缓存；不存在时从镜像下载"""
+    from huggingface_hub import snapshot_download
+
+    cached_model = get_cached_model_path(model_size, cache_dir)
+    if cached_model:
+        print(f"[模型] 已存在: {cached_model}")
+        return cached_model
+
+    repo_id = f"Systran/faster-whisper-{model_size}"
+    print(f"[模型] 未找到本地缓存，开始下载 {repo_id} (镜像: hf-mirror.com)...")
+
+    downloaded_path = snapshot_download(repo_id, cache_dir=str(cache_dir))
+
+    cached_model = get_cached_model_path(model_size, cache_dir)
+    return cached_model or downloaded_path
 
 
 def _get_ffmpeg() -> str:
@@ -165,7 +184,7 @@ def _fmt_time(seconds: float) -> str:
 
 def main():
     parser = argparse.ArgumentParser(description="视频字幕提取（转录+格式转换）")
-    parser.add_argument("directory", type=Path, help="包含 MP4 视频的目录")
+    parser.add_argument("input_path", type=Path, help="MP4 视频文件或包含 MP4 视频的目录")
     parser.add_argument("--model", default="base",
                         choices=["tiny", "base", "small", "medium"],
                         help="whisper 模型大小 (默认: base)")
@@ -176,23 +195,29 @@ def main():
     parser.add_argument("--cache-dir", type=Path,
                         default=Path(__file__).parent / ".whisper_models",
                         help="模型缓存目录")
+    parser.add_argument("--prepare-model-only", action="store_true",
+                        help="只检查/下载模型，不扫描或转录视频")
     args = parser.parse_args()
 
-    work_dir = args.directory.resolve()
-    if not work_dir.exists():
-        sys.exit(f"[错误] 目录不存在: {work_dir}")
-    output_dir = (args.output_dir or work_dir).resolve()
+    input_path = args.input_path.resolve()
+    if not input_path.exists():
+        sys.exit(f"[错误] 路径不存在: {input_path}")
+    default_output_dir = input_path.parent if input_path.is_file() else input_path
+    output_dir = (args.output_dir or default_output_dir).resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    # ── Step 1: 查找视频 ──
-    videos = find_videos(work_dir)
+    # ── Step 1: 检查/下载模型 ──
+    args.cache_dir.mkdir(parents=True, exist_ok=True)
+    model_path = ensure_model(args.model, args.cache_dir)
+    if args.prepare_model_only:
+        print(f"[完成] 模型已就绪: {model_path}")
+        return
+
+    # ── Step 2: 查找视频 ──
+    videos = find_videos(input_path)
     print(f"[扫描] 找到 {len(videos)} 个视频:")
     for v in videos:
         print(f"  - {v.name} ({v.stat().st_size / 1024**2:.1f} MB)")
-
-    # ── Step 2: 下载/加载模型 ──
-    args.cache_dir.mkdir(parents=True, exist_ok=True)
-    model_path = download_model(args.model, args.cache_dir)
 
     # ── Step 3: 转录 → SRT ──
     srt_files = transcribe_videos(videos, model_path, output_dir, args.language)
