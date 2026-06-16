@@ -516,7 +516,7 @@ Subagent 1（分镜01-05）：                 Subagent 2（分镜06-10）：   
 【生成工具】Agnes Image 2.1 Flash
 【API脚本路径】scripts/agnes_api.py
 【输出目录】output/storyboards/images/
-【输出尺寸】1920x1080
+【输出尺寸】1280x720（⚠️ 1920×1080 不被 Agnes Image 支持，会导致 HTTP 500）
 【源提示词文件目录】output/storyboards/
 
 【你要生成的分镜范围】分镜XX 至 分镜XX
@@ -527,7 +527,7 @@ Subagent 1（分镜01-05）：                 Subagent 2（分镜06-10）：   
 3. 执行生成命令：
    PYTHONUTF8=1 python scripts/agnes_api.py image \
      --prompt "[分镜图提示词全文]" \
-     --size 1920x1080 \
+     --size 1280x720 \
      --out output/storyboards/images/分镜XX_关键帧.png
 4. 确认生成图片存在且文件大小 > 0
 5. 报告每个分镜的生成结果（成功/失败+文件路径）

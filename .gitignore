@@ -1,2 +1,5 @@
 # Whisper 模型缓存（体积大，各机器自行下载）
 .whisper_models/
+
+# Python cache
+__pycache__/
