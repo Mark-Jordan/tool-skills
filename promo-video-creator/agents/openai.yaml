@@ -1,4 +1,4 @@
 interface:
-  display_name: "宣传视频创作"
-  short_description: "从素材分析到分镜提示词生成，完整宣传视频创作工作流。集成Agnes图片/视频生成。"
-  default_prompt: "按照宣传视频创作工作流，从收集参考素材开始，逐步完成字幕脚本、分镜设计和提示词生成。"
+  display_name: "宣传视频自动化创作"
+  short_description: "分析多份资料，自动生成分镜、提示词、音频占位与成片流程。"
+  default_prompt: "读取用户提供的多份资料和参考素材，先做语义分析与创作理解，再生成分镜总览、单镜头文档、图像提示词、视频提示词和音频占位，并按流程完成图片、视频与HyperFrames拼接。"
