@@ -15,6 +15,26 @@ import urllib.parse
 import urllib.request
 from pathlib import Path
 
+# Fix Chinese/CJK character encoding on Windows command line.
+# On Windows, CLI arguments are decoded using the system locale (GBK/CP936 on
+# Chinese Windows), not UTF-8. Setting PYTHONUTF8=1 in the environment fixes this,
+# but it must be set BEFORE Python starts — it cannot be patched at runtime.
+# If your Chinese prompts produce unrelated images, invoke with:
+#   PYTHONUTF8=1 python scripts/agnes_api.py ...
+# Or use --prompt-file to read the prompt from a UTF-8 text file.
+
+
+def read_prompt(prompt: str | None, prompt_file: str | None) -> str:
+    """Resolve prompt from --prompt or --prompt-file. At least one must be provided."""
+    if prompt_file:
+        path = Path(prompt_file)
+        if not path.exists():
+            raise SystemExit(f"Prompt file not found: {path}")
+        return path.read_text(encoding="utf-8").strip()
+    if prompt is not None:
+        return prompt
+    raise SystemExit("Either --prompt or --prompt-file must be specified.")
+
 
 BASE_URL = "https://apihub.agnes-ai.com"
 IMAGE_MODEL = "agnes-image-2.1-flash"
@@ -170,6 +190,8 @@ def image_command(args: argparse.Namespace) -> None:
     if args.image and args.return_base64:
         raise SystemExit("For image-to-image Base64 output, use --response-format b64_json instead of --return-base64.")
 
+    prompt = read_prompt(getattr(args, "prompt", None), getattr(args, "prompt_file", None))
+
     requested_format = args.response_format
     if requested_format is None and not (args.return_base64 and not args.image):
         requested_format = "url"
@@ -183,7 +205,7 @@ def image_command(args: argparse.Namespace) -> None:
 
     body: dict = {
         "model": IMAGE_MODEL,
-        "prompt": args.prompt,
+        "prompt": prompt,
         "size": args.size,
     }
     if extra_body:
@@ -225,13 +247,14 @@ def video_result(video_id: str, model_name: str | None, timeout: int) -> dict:
 
 
 def video_command(args: argparse.Namespace) -> None:
+    prompt = read_prompt(getattr(args, "prompt", None), getattr(args, "prompt_file", None))
     num_frames = args.num_frames or frames_for_seconds(args.seconds, args.frame_rate)
     if num_frames > 441 or (num_frames - 1) % 8 != 0:
         raise SystemExit("num_frames must be <= 441 and follow the 8n + 1 rule.")
 
     body: dict = {
         "model": VIDEO_MODEL,
-        "prompt": args.prompt,
+        "prompt": prompt,
         "height": args.height,
         "width": args.width,
         "num_frames": num_frames,
@@ -286,6 +309,7 @@ def video_command(args: argparse.Namespace) -> None:
 
 
 def text_command(args: argparse.Namespace) -> None:
+    prompt = read_prompt(getattr(args, "prompt", None), getattr(args, "prompt_file", None))
     body = {
         "model": TEXT_MODEL,
         "messages": [
@@ -295,7 +319,7 @@ def text_command(args: argparse.Namespace) -> None:
             },
             {
                 "role": "user",
-                "content": args.prompt,
+                "content": prompt,
             },
         ],
         "temperature": args.temperature,
@@ -319,7 +343,8 @@ def build_parser() -> argparse.ArgumentParser:
     config.set_defaults(func=config_command)
 
     image = sub.add_parser("image", help="Generate or edit an image")
-    image.add_argument("--prompt", required=True)
+    image.add_argument("--prompt", default=None)
+    image.add_argument("--prompt-file", default=None)
     image.add_argument("--size", default="1024x768")
     image.add_argument("--image", action="append", help="Input image URL, Data URI, or local file. Repeat for multiple.")
     image.add_argument("--response-format", choices=["url", "b64_json"])
@@ -330,7 +355,8 @@ def build_parser() -> argparse.ArgumentParser:
     image.set_defaults(func=image_command)
 
     video = sub.add_parser("video", help="Create and poll a video task")
-    video.add_argument("--prompt", required=True)
+    video.add_argument("--prompt", default=None)
+    video.add_argument("--prompt-file", default=None)
     video.add_argument("--image", action="append", help="Input image URL, Data URI, or local file. Repeat for multiple.")
     video.add_argument("--keyframes", action="store_true")
     video.add_argument("--seconds", type=float, default=5.0)
@@ -348,7 +374,8 @@ def build_parser() -> argparse.ArgumentParser:
     video.set_defaults(func=video_command)
 
     text = sub.add_parser("text", help="Lightweight text helper")
-    text.add_argument("--prompt", required=True)
+    text.add_argument("--prompt", default=None)
+    text.add_argument("--prompt-file", default=None)
     text.add_argument("--system", default="You are a concise prompt assistant for image and video generation. Keep answers short and directly usable.")
     text.add_argument("--temperature", type=float, default=0.4)
     text.add_argument("--max-tokens", type=int, default=512)
